@@ -13,6 +13,8 @@ defmodule Anchor do
 
   def get(_txn, _key), do: error()
   def put(_txn, _key, _value), do: error()
+  def delete(_txn, _key), do: error()
+  def scan(_env, _min, _max, _take), do: error()
   def range(_txn, _start, _end), do: error()
   def range_next(_cur), do: error()
 
@@ -28,27 +30,34 @@ defmodule Anchor do
     {:ok, env} = Anchor.open_env("data")
     {:ok, rtx} = Anchor.txn_read_new(env)
 
+    start = :os.system_time(:millisecond)
+
     Stream.resource(
       fn ->
-        {:ok, cur} = Anchor.range(rtx, "audit:log", "audit:loh")
-        cur
+        {"audit:log", "audit:loh"}
       end,
-      fn cur ->
-        case range_take(cur, 50) do
-          {:ok, kv} ->
-            {kv, cur}
+      fn {min, max} ->
+        case Anchor.scan(env, min, max, 100) do
+          {:ok, {new_min, results}} ->
+            {prefix, [head | _]} =
+              new_min
+              |> String.to_charlist()
+              |> Enum.split(String.length(new_min) - 1)
+
+            {results, {String.Chars.to_string(prefix ++ [head + 1]), max}}
 
           _ ->
             {:halt, :done}
         end
       end,
       fn
-        :done -> :ok
-        cur -> range_abort(cur)
+        _ -> :ok
       end
     )
     |> Enum.count()
     |> IO.inspect()
+
+    IO.inspect(:os.system_time(:millisecond) - start)
 
     Anchor.txn_read_abort(rtx)
   end

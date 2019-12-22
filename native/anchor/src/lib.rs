@@ -30,6 +30,8 @@ rustler::rustler_export_nifs! {
         ("txn_read_abort", 1, txn_read_abort),
         ("get", 2, get),
         ("put", 3, put),
+        ("delete", 2, delete),
+        ("scan", 4, scan),
         ("range", 3, range),
         ("range_next", 1, range_next),
         ("range_take", 2, range_take),
@@ -81,6 +83,9 @@ enum Command {
         value: String,
     },
     Get {
+        key: String,
+    },
+    Delete {
         key: String,
     },
     Next {},
@@ -197,6 +202,29 @@ fn range_abort<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
     call(tx, Command::Done {}).encode(env)
 }
 
+fn scan<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
+    let wrapper: ResourceArc<Wrapper<lmdb_rs::Environment>> = args[0].decode()?;
+    let min: &str = args[1].decode()?;
+    let max: &str = args[2].decode()?;
+    let take: usize = args[3].decode()?;
+    let mut txn = wrapper.value.get_reader().unwrap();
+    let handle = wrapper
+        .value
+        .get_default_db(lmdb_rs::DbFlags::empty())
+        .unwrap();
+    let db = txn.bind(&handle);
+    let cursor = db.keyrange_from_to(&min, &max).unwrap().take(take);
+    let mut results = vec![];
+    for item in cursor {
+        results.push((item.get_key::<&str>(), item.get_value::<&str>()));
+    }
+    txn.abort();
+    match results.len() {
+        0 => Ok(atoms::done().encode(env)),
+        _ => Ok((atoms::ok(), (results.last().unwrap().0, results)).encode(env)),
+    }
+}
+
 fn put<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
     let tx: ResourceArc<CommandSender> = args[0].decode()?;
     let key: &str = args[1].decode()?;
@@ -214,6 +242,18 @@ fn get<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
     call(
         tx,
         Command::Get {
+            key: key.to_string(),
+        },
+    )
+    .encode(env)
+}
+
+fn delete<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
+    let tx: ResourceArc<CommandSender> = args[0].decode()?;
+    let key: &str = args[1].decode()?;
+    call(
+        tx,
+        Command::Delete {
             key: key.to_string(),
         },
     )
@@ -244,6 +284,10 @@ fn process(db: lmdb_rs::Database, rx: CommandReceiver) -> Option<ReplySender> {
             },
             (Command::Put { key, value }, reply) => {
                 db.set(&key, &value).unwrap();
+                reply.0.send(Reply::Ok {}).unwrap();
+            }
+            (Command::Delete { key }, reply) => {
+                db.del(&key).unwrap();
                 reply.0.send(Reply::Ok {}).unwrap();
             }
             (
