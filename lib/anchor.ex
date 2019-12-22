@@ -16,6 +16,8 @@ defmodule Anchor do
   def range(_txn, _start, _end), do: error()
   def range_next(_cur), do: error()
 
+  def range_take(_cur, _count), do: error()
+
   def range_abort(_cur), do: error()
 
   def error() do
@@ -32,9 +34,9 @@ defmodule Anchor do
         cur
       end,
       fn cur ->
-        case range_next(cur) do
+        case range_take(cur, 50) do
           {:ok, kv} ->
-            {[kv], cur}
+            {kv, cur}
 
           _ ->
             {:halt, :done}
@@ -45,7 +47,7 @@ defmodule Anchor do
         cur -> range_abort(cur)
       end
     )
-    |> Enum.take(100)
+    |> Enum.count()
     |> IO.inspect()
 
     Anchor.txn_read_abort(rtx)

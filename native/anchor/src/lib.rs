@@ -32,6 +32,7 @@ rustler::rustler_export_nifs! {
         ("put", 3, put),
         ("range", 3, range),
         ("range_next", 1, range_next),
+        ("range_take", 2, range_take),
         ("range_abort", 1, range_abort),
     ],
     Some(on_init)
@@ -41,6 +42,7 @@ enum Reply {
     Ok {},
     Value { value: String },
     KeyValue { key: String, value: String },
+    KeyValueBatch { results: Vec<(String, String)> },
     Done {},
     NotFound {},
 }
@@ -51,6 +53,7 @@ impl Reply {
             Reply::Ok {} => Ok(atoms::ok().encode(env)),
             Reply::Value { value } => Ok((atoms::ok(), value).encode(env)),
             Reply::KeyValue { key, value } => Ok((atoms::ok(), (key, value)).encode(env)),
+            Reply::KeyValueBatch { results } => Ok((atoms::ok(), results).encode(env)),
             Reply::Done {} => Ok(atoms::done().encode(env)),
             Reply::NotFound {} => Ok((atoms::error(), atoms::not_found()).encode(env)),
         }
@@ -81,6 +84,9 @@ enum Command {
         key: String,
     },
     Next {},
+    Take {
+        count: usize,
+    },
     Done {},
 }
 
@@ -180,6 +186,12 @@ fn range_next<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
     call(tx, Command::Next {}).encode(env)
 }
 
+fn range_take<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
+    let tx: ResourceArc<CommandSender> = args[0].decode()?;
+    let number: usize = args[1].decode()?;
+    call(tx, Command::Take { count: number }).encode(env)
+}
+
 fn range_abort<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
     let tx: ResourceArc<CommandSender> = args[0].decode()?;
     call(tx, Command::Done {}).encode(env)
@@ -261,6 +273,30 @@ fn process(db: lmdb_rs::Database, rx: CommandReceiver) -> Option<ReplySender> {
                                 break;
                             }
                         },
+                        (Command::Take { count }, cursor_reply) => {
+                            let mut results = vec![];
+                            for _n in 0..count {
+                                match cursor.next() {
+                                    Some(next) => {
+                                        results.push((
+                                            next.get_key::<&str>().to_string(),
+                                            next.get_value::<&str>().to_string(),
+                                        ));
+                                    }
+                                    _ => {
+                                        break;
+                                    }
+                                }
+                            }
+                            if results.len() == 0 {
+                                cursor_reply.0.send(Reply::Done {}).unwrap();
+                                break;
+                            }
+                            cursor_reply
+                                .0
+                                .send(Reply::KeyValueBatch { results: results })
+                                .unwrap();
+                        }
                         (Command::Done {}, cursor_reply) => {
                             cursor_reply.0.send(Reply::Ok {}).unwrap();
                             break;
