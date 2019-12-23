@@ -1,16 +1,16 @@
-defmodule Anchor.MixProject do
+defmodule Bridge.LMDB.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :anchor,
+      app: :bridge_lmdb,
       version: "0.1.0",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
       compilers: [:rustler] ++ Mix.compilers(),
       rustler_crates: [
-        anchor: [
-          path: "native/anchor"
+        bridge_lmdb: [
+          path: "native/bridge_lmdb"
         ]
       ],
       deps: deps()

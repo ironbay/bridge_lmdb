@@ -1,11 +1,11 @@
 [package]
-name = "anchor"
+name = "bridge_lmdb"
 version = "0.1.0"
 authors = []
 edition = "2018"
 
 [lib]
-name = "anchor"
+name = "bridge_lmdb"
 path = "src/lib.rs"
 crate-type = ["dylib"]
 

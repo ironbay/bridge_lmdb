@@ -1,5 +1,5 @@
-defmodule Anchor do
-  use Rustler, otp_app: :anchor
+defmodule Bridge.LMDB do
+  use Rustler, otp_app: :bridge_lmdb
 
   def open_env(_arg1), do: error()
 
@@ -27,8 +27,8 @@ defmodule Anchor do
   end
 
   def test() do
-    {:ok, env} = Anchor.open_env("data")
-    {:ok, rtx} = Anchor.txn_read_new(env)
+    {:ok, env} = open_env("data")
+    {:ok, rtx} = txn_read_new(env)
 
     start = :os.system_time(:millisecond)
 
@@ -37,7 +37,7 @@ defmodule Anchor do
         {"audit:log", "audit:loh"}
       end,
       fn {min, max} ->
-        case Anchor.scan(env, min, max, 100) do
+        case scan(env, min, max, 100) do
           {:ok, {new_min, results}} ->
             {prefix, [head | _]} =
               new_min
@@ -59,6 +59,6 @@ defmodule Anchor do
 
     IO.inspect(:os.system_time(:millisecond) - start)
 
-    Anchor.txn_read_abort(rtx)
+    txn_read_abort(rtx)
   end
 end

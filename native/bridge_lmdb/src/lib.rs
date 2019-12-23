@@ -19,7 +19,7 @@ mod wrapper;
 use wrapper::Wrapper;
 
 rustler::rustler_export_nifs! {
-    "Elixir.Anchor",
+    "Elixir.Bridge.LMDB",
     [
         // ("test", 1, test),
         // ("open_ctx", 1, open_ctx),

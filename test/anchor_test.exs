@@ -1,8 +1,8 @@
-defmodule AnchorTest do
+defmodule Bridge.LMDB.Test do
   use ExUnit.Case
-  doctest Anchor
+  doctest Bridge.LMDB
 
   test "greets the world" do
-    assert Anchor.hello() == :world
+    # assert Bridge.LMDB.hello() == :world
   end
 end
