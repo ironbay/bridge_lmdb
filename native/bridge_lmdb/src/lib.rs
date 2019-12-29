@@ -32,6 +32,7 @@ rustler::rustler_export_nifs! {
         ("put", 3, put),
         ("delete", 2, delete),
         ("scan", 4, scan),
+        ("test", 3, test),
         ("range", 3, range),
         ("batch_write", 3, batch_write),
         ("range_next", 1, range_next),
@@ -247,6 +248,25 @@ fn scan<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
         0 => Ok(atoms::done().encode(env)),
         _ => Ok((atoms::ok(), (results.last().unwrap().0, results)).encode(env)),
     }
+}
+
+fn test<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
+    let wrapper: ResourceArc<Wrapper<lmdb_rs::Environment>> = args[0].decode()?;
+    let min: &str = args[1].decode()?;
+    let max: &str = args[2].decode()?;
+    let mut txn = wrapper.value.get_reader().unwrap();
+    let handle = wrapper
+        .value
+        .get_default_db(lmdb_rs::DbFlags::empty())
+        .unwrap();
+    let db = txn.bind(&handle);
+    let cursor = db.keyrange_from_to(&min, &max).unwrap();
+    let mut results = vec![];
+    for item in cursor {
+        results.push((item.get_key::<&str>(), item.get_value::<&str>()));
+    }
+    txn.abort();
+    Ok((atoms::ok(), results.len()).encode(env))
 }
 
 fn put<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {

@@ -15,6 +15,8 @@ defmodule Bridge.LMDB do
   def put(_txn, _key, _value), do: error()
   def delete(_txn, _key), do: error()
   def scan(_env, _min, _max, _take), do: error()
+
+  def test(_env, _min, _max), do: error()
   def range(_txn, _start, _end), do: error()
   def range_next(_cur), do: error()
 
@@ -26,6 +28,36 @@ defmodule Bridge.LMDB do
 
   def error() do
     :erlang.nif_error(:nif_not_loaded)
+  end
+
+  def stream(env, min, max) do
+    Stream.resource(
+      fn ->
+        {min, max}
+      end,
+      fn {min, max} ->
+        case Bridge.LMDB.scan(env, min, max, 100) do
+          {:ok, {new_min, results}} ->
+            {results, {prefix(new_min), max}}
+
+          _ ->
+            {:halt, :done}
+        end
+      end,
+      fn _ -> :ok end
+    )
+  end
+
+  def prefix(<<0>>) do
+    <<127>>
+  end
+
+  def prefix(<<head>>) do
+    <<head + 1>>
+  end
+
+  def prefix(<<head>> <> tail) do
+    <<head>> <> prefix(tail)
   end
 
   @max 100_000
@@ -44,6 +76,18 @@ defmodule Bridge.LMDB do
     {:ok, env} = open_env("data")
 
     Bridge.LMDB.batch_write(env, Enum.map(0..@max, fn item -> {inspect(item), "foo"} end), [])
+  end
+
+  def test_scan() do
+    {:ok, env} = open_env("data")
+
+    stream(env, "0", "9")
+    |> Enum.count()
+  end
+
+  def test_test() do
+    {:ok, env} = open_env("data")
+    test(env, "0", "9")
   end
 end
 
