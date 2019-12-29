@@ -33,6 +33,7 @@ rustler::rustler_export_nifs! {
         ("delete", 2, delete),
         ("scan", 4, scan),
         ("range", 3, range),
+        ("batch_write", 3, batch_write),
         ("range_next", 1, range_next),
         ("range_take", 2, range_take),
         ("range_abort", 1, range_abort),
@@ -122,6 +123,29 @@ fn open_env<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
         .get_default_db(lmdb_rs::DbFlags::empty())
         .unwrap();
     Ok((atoms::ok(), ResourceArc::new(Wrapper::new(environment))).encode(env))
+}
+
+fn batch_write<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
+    let wrapper: ResourceArc<Wrapper<lmdb_rs::Environment>> = args[0].decode()?;
+    let sets: Vec<(String, String)> = args[1].decode()?;
+    let deletes: Vec<String> = args[2].decode()?;
+    let txn = wrapper.value.new_transaction().unwrap();
+    let handle = wrapper
+        .value
+        .get_default_db(lmdb_rs::DbFlags::empty())
+        .unwrap();
+    let db = txn.bind(&handle);
+    for key in deletes {
+        db.del(&key).unwrap();
+    }
+
+    for (key, value) in sets {
+        db.set(&key, &value).unwrap();
+    }
+
+    txn.commit().unwrap();
+
+    Ok(atoms::ok().encode(env))
 }
 
 fn txn_write_new<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
