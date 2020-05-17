@@ -33,18 +33,12 @@ defmodule Bridge.LMDB do
   def stream(env, min, max) do
     Stream.resource(
       fn ->
-        {min, max, false}
+        {min, max}
       end,
-      fn {min, max, drop} ->
+      fn {min, max} ->
         case Bridge.LMDB.scan(env, min, max, 100) do
-          {_, {_new_min, results}} when drop == true and length(results) == 1 ->
-            {:halt, :done}
-
-          {:ok, {new_min, results}} when drop == false ->
-            {results, {new_min, max, true}}
-
-          {:ok, {new_min, results}} when drop == true ->
-            {Stream.drop(results, 1), {new_min, max, true}}
+          {:ok, {new_min, results}} ->
+            {results, {new_min <> <<0>>, max}}
 
           _ ->
             {:halt, :done}
