@@ -33,12 +33,18 @@ defmodule Bridge.LMDB do
   def stream(env, min, max) do
     Stream.resource(
       fn ->
-        {min, max}
+        {min, max, false}
       end,
-      fn {min, max} ->
+      fn {min, max, drop} ->
         case Bridge.LMDB.scan(env, min, max, 100) do
-          {:ok, {new_min, results}} ->
-            {results, {prefix(new_min), max}}
+          {_, {_new_min, results}} when drop == true and length(results) == 1 ->
+            {:halt, :done}
+
+          {:ok, {new_min, results}} when drop == false ->
+            {results, {new_min, max, true}}
+
+          {:ok, {new_min, results}} when drop == true ->
+            {Stream.drop(results, 1), {new_min, max, true}}
 
           _ ->
             {:halt, :done}
@@ -46,18 +52,6 @@ defmodule Bridge.LMDB do
       end,
       fn _ -> :ok end
     )
-  end
-
-  def prefix(<<0>>) do
-    <<127>>
-  end
-
-  def prefix(<<head>>) do
-    <<head + 1>>
-  end
-
-  def prefix(<<head>> <> tail) do
-    <<head>> <> prefix(tail)
   end
 
   @max 100_000
