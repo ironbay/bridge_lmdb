@@ -10,6 +10,6 @@ path = "src/lib.rs"
 crate-type = ["dylib"]
 
 [dependencies]
-rustler = "0.21.0"
+rustler = "0.21.1"
 lazy_static = "1.0"
 lmdb-rs = "0.7.6"
