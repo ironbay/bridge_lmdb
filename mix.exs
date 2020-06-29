@@ -4,10 +4,11 @@ defmodule Bridge.LMDB.MixProject do
   def project do
     [
       app: :bridge_lmdb,
-      version: "0.1.3",
+      version: "0.1.4",
       description: "Rust based connector to LMDB",
       package: [
         files: ["lib", "native", ".formatter.exs", "README*", "mix.exs"],
+        exclude_patterns: ["target"],
         licenses: ["MIT"],
         links: %{"GitHub" => "https://github.com/ironbay/bridge_lmdb"}
       ],
