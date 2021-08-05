@@ -1,5 +1,7 @@
 defmodule Bridge.LMDB do
-  use Rustler, otp_app: :bridge_lmdb
+  use Rustler,
+    otp_app: :bridge_lmdb,
+    crate: :bridge_lmdb
 
   def open_env(_arg1), do: error()
 
